@@ -1,5 +1,6 @@
 
 import os
+from pydoc import cli
 import sys
 from rich.console import RenderableType
 
@@ -7,7 +8,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.traceback import Traceback
 from rich.text import Text
-
+from rich import print
 from textual.reactive import Reactive
 from textual.app import App
 from textual.widgets import Header, Footer, FileClick, ScrollView, DirectoryTree
@@ -18,20 +19,27 @@ class Input(Widget):
     text = Reactive('')
     has_focus = Reactive(False)
     cursor = '|'
-    cursor_pos = Reactive(0)
+    cursor_pos = Reactive([0, 0])
     changing = False
 
     def on_mount(self):
         self.set_interval(1, self.handle_cursor)
 
     def handle_cursor(self):
-        self.cursor = '' if self.cursor and not self.changing else '|'
+        self.cursor = '' if self.cursor else '|'
         self.refresh()
 
-    def render(self) -> Panel:
+    def render(self) -> Syntax:
+        text = self.text.splitlines()
+        rendered_text = ''
+        for index, line in enumerate(text):
+            if index == self.cursor_pos[1]:
+                rendered_text += line[:self.cursor_pos[0]] + \
+                    self.cursor + line[self.cursor_pos[0]:]
+                continue
+            rendered_text += line+'\n'
         return Syntax(
-            self.text[:self.cursor_pos] + self.cursor +
-            self.text[self.cursor_pos:],
+            rendered_text,
             'python',
             line_numbers=True,
             word_wrap=True,
@@ -43,42 +51,50 @@ class Input(Widget):
         if not self.has_focus:
             return
 
-        self.changing = True
+        self.cursor = '|'
         if event.key == 'ctrl+h':
-            self.text = self.text[: self.cursor_pos -
-                                  1] + self.text[self.cursor_pos:]
-            self.cursor_pos -= 1 if self.cursor_pos > 0 else 0
+            if self.cursor_pos[0] != 0:
+                self.text = self.text[: self.cursor_pos[0] -
+                                      1] + self.text[self.cursor_pos[0]:]
+                self.cursor_pos[0] -= 1 if self.cursor_pos[0] > 0 else 0
 
         elif event.key == 'ctrl+i':
-            self.text = self.text[:self.cursor_pos] + \
-                '\t' + self.text[self.cursor_pos:]
-            self.cursor_pos += 1
+            self.text = self.text[:self.cursor_pos[0]] + \
+                '\t' + self.text[self.cursor_pos[0]:]
+            self.cursor_pos[0] += 1
         elif event.key == 'enter':
-            self.text = self.text[:self.cursor_pos] + \
-                '\n' + self.text[self.cursor_pos:]
-            self.cursor_pos += 1
+            self.text = self.text[:self.cursor_pos[0]] + \
+                '\n' + self.text[self.cursor_pos[0]:]
+            self.cursor_pos[0] += 1
+            self.cursor_pos[1] += 1
 
         elif event.key == 'left':
-            self.cursor_pos -= 1 if self.cursor_pos > 0 else 0
+            self.cursor_pos[0] -= 1 if self.cursor_pos[0] > 0 else 0
 
         elif event.key == 'right':
-            self.cursor_pos += 1 if self.cursor_pos < len(self.text) else 0
+            self.cursor_pos[0] += 1 if self.cursor_pos[0] < len(
+                self.text) else 0
         elif event.key == 'up':
-            self.cursor_pos += 1 if self.cursor_pos < len(self.text) else 0
+            self.cursor_pos[1] -= 1 if self.cursor_pos[1] > 0 else 0
         elif event.key == 'down':
-            self.cursor_pos += 1 if self.cursor_pos < len(self.text) else 0
+            self.cursor_pos[1] += 1 if self.cursor_pos[1] < len(
+                self.text.splitlines()) else 0
 
         elif not event.key.startswith('ctrl'):
-            self.text = self.text[:self.cursor_pos] + \
-                event.key + self.text[self.cursor_pos:]
-            self.cursor_pos += 1
-        self.changing = False
+            self.text = self.text[:self.cursor_pos[0]] + \
+                event.key + self.text[self.cursor_pos[0]:]
+            self.cursor_pos[0] += 1
+        self.refresh(layout=True)
 
     async def on_focus(self, event) -> None:
         self.has_focus = True
 
     async def on_blur(self, event) -> None:
         self.has_focus = False
+
+    async def on_click(self, event) -> None:
+        self.cursor_pos[0] = event.x
+        self.cursor_pos[1] = event.y
 
 
 class MyApp(App):
