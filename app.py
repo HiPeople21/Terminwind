@@ -18,34 +18,42 @@ from textual.widget import Widget
 class Input(Widget):
     text = Reactive('')
     has_focus = Reactive(False)
-    cursor = '|'
+    cursor = Reactive('|')
     cursor_pos = Reactive([0, 0])
-    changing = False
 
-    def on_mount(self):
+    def __init__(self, text):
+
+        super().__init__()
+        self.text = text
+
+    async def on_mount(self):
         self.set_interval(1, self.handle_cursor)
 
     def handle_cursor(self):
-        self.cursor = '' if self.cursor else '|'
-        self.refresh()
+        if self.has_focus:
+            self.cursor = '' if self.cursor else '|'
+        self.refresh(layout=True)
 
-    def render(self) -> Syntax:
+    def render(self) -> Panel:
         text = self.text.splitlines()
         rendered_text = ''
         for index, line in enumerate(text):
+
+            if index != len(text) - 1:
+                line += '\n'
             if index == self.cursor_pos[1]:
                 rendered_text += line[:self.cursor_pos[0]] + \
-                    self.cursor + line[self.cursor_pos[0]:]
+                    self.cursor + line[self.cursor_pos[0]:] + '\n'
                 continue
-            rendered_text += line+'\n'
-        return Syntax(
+            rendered_text += line
+        return Panel(Syntax(
             rendered_text,
             'python',
             line_numbers=True,
             word_wrap=True,
             indent_guides=True,
             theme="monokai",
-        )
+        ))
 
     async def on_key(self, event) -> None:
         if not self.has_focus:
@@ -65,25 +73,31 @@ class Input(Widget):
         elif event.key == 'enter':
             self.text = self.text[:self.cursor_pos[0]] + \
                 '\n' + self.text[self.cursor_pos[0]:]
-            self.cursor_pos[0] += 1
+            self.cursor_pos[0] = 0
             self.cursor_pos[1] += 1
 
         elif event.key == 'left':
-            self.cursor_pos[0] -= 1 if self.cursor_pos[0] > 0 else 0
+            if self.cursor_pos[0] > 0:
+                self.cursor_pos[0] -= 1
+            elif self.cursor_pos[1] > 0:
+                self.cursor_pos[1] -= 1
 
         elif event.key == 'right':
-            self.cursor_pos[0] += 1 if self.cursor_pos[0] < len(
-                self.text) else 0
+            if self.cursor_pos[0] < len(self.text.splitlines()[self.cursor_pos[1]]) - 1:
+                self.cursor_pos[0] += 1
+            elif self.cursor_pos[1] < len(self.text.splitlines()) - 1:
+                self.cursor_pos[1] += 1
         elif event.key == 'up':
             self.cursor_pos[1] -= 1 if self.cursor_pos[1] > 0 else 0
         elif event.key == 'down':
             self.cursor_pos[1] += 1 if self.cursor_pos[1] < len(
-                self.text.splitlines()) else 0
+                self.text.splitlines()) - 1 else len(self.text.splitlines()) - 1
 
         elif not event.key.startswith('ctrl'):
             self.text = self.text[:self.cursor_pos[0]] + \
                 event.key + self.text[self.cursor_pos[0]:]
             self.cursor_pos[0] += 1
+        print(self.cursor_pos)
         self.refresh(layout=True)
 
     async def on_focus(self, event) -> None:
@@ -91,6 +105,7 @@ class Input(Widget):
 
     async def on_blur(self, event) -> None:
         self.has_focus = False
+        self.cursor = ''
 
     async def on_click(self, event) -> None:
         self.cursor_pos[0] = event.x
@@ -119,7 +134,7 @@ class MyApp(App):
 
         # Create our widgets
         # In this a scroll view for the code and a directory tree
-        self.body = ScrollView(Input())
+        self.body = ScrollView()
         self.directory = DirectoryTree(self.path, "Code")
 
         # Dock our widgets
@@ -138,13 +153,9 @@ class MyApp(App):
         syntax: RenderableType
         try:
             # Construct a Syntax object for the path in the message
-            syntax = Syntax.from_path(
-                message.path,
-                line_numbers=True,
-                word_wrap=True,
-                indent_guides=True,
-                theme="monokai",
-            )
+            with open(message.path) as f:
+
+                syntax = Input(f.read())
         except Exception:
             # Possibly a binary file
             # For demonstration purposes we will show the traceback
