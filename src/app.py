@@ -1,6 +1,5 @@
-
+from typing import List
 import os
-from pydoc import cli
 import sys
 from rich.console import RenderableType
 
@@ -8,18 +7,22 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.traceback import Traceback
 from rich.text import Text
-from rich import print
 from textual.reactive import Reactive
 from textual.app import App
 from textual.widgets import Header, Footer, FileClick, ScrollView, DirectoryTree
 from textual.widget import Widget
 
+OFFSET_X = 8
+OFFSET_Y = 1
 
-class Input(Widget):
+
+class EditableArea(Widget):
+    # TODO: Arrow Key Controls
     text = Reactive('')
     has_focus = Reactive(False)
     cursor = Reactive('|')
     cursor_pos = Reactive([0, 0])
+    prev_x = None
 
     def __init__(self, text):
 
@@ -35,17 +38,20 @@ class Input(Widget):
         self.refresh(layout=True)
 
     def render(self) -> Panel:
-        text = self.text.splitlines()
-        rendered_text = ''
-        for index, line in enumerate(text):
+        text: List[str] = self.text.splitlines()
+        rendered_text: str = ''
 
+        for index, line in enumerate(text):
             if index != len(text) - 1:
                 line += '\n'
             if index == self.cursor_pos[1]:
-                rendered_text += line[:self.cursor_pos[0]] + \
-                    self.cursor + line[self.cursor_pos[0]:] + '\n'
+                rendered_text += (
+                    line[:self.cursor_pos[0]] +
+                    self.cursor + line[self.cursor_pos[0]:]
+                )
                 continue
             rendered_text += line
+
         return Panel(Syntax(
             rendered_text,
             'python',
@@ -58,46 +64,110 @@ class Input(Widget):
     async def on_key(self, event) -> None:
         if not self.has_focus:
             return
-
+        text = self.text.splitlines()
         self.cursor = '|'
+
         if event.key == 'ctrl+h':
-            if self.cursor_pos[0] != 0:
-                self.text = self.text[: self.cursor_pos[0] -
-                                      1] + self.text[self.cursor_pos[0]:]
-                self.cursor_pos[0] -= 1 if self.cursor_pos[0] > 0 else 0
+
+            if self.cursor_pos[0] > 0:
+
+                self.text = (
+                    '\n'.join(text[:self.cursor_pos[1]]) +
+                    '\n' +
+                    text[self.cursor_pos[1]][: self.cursor_pos[0] - 1] +
+                    text[self.cursor_pos[1]][self.cursor_pos[0]:] +
+                    '\n' +
+                    '\n'.join(text[self.cursor_pos[1] + 1:])
+                )
+
+                self.cursor_pos[0] -= 1
+            else:
+
+                self.text = (
+                    '\n'.join(text[:self.cursor_pos[1]]) +
+                    text[self.cursor_pos[1]][self.cursor_pos[0]:] +
+                    '\n' +
+                    '\n'.join(text[self.cursor_pos[1] + 1:])
+                )
+                if self.cursor_pos[1] > 0:
+                    self.cursor_pos[1] -= 1
+                    self.cursor_pos[0] = len(text[self.cursor_pos[1]])
 
         elif event.key == 'ctrl+i':
-            self.text = self.text[:self.cursor_pos[0]] + \
-                '\t' + self.text[self.cursor_pos[0]:]
+            prev = ''
+            for line in text[:self.cursor_pos[1]]:
+                prev += line + '\n'
+            self.text = (
+                prev +
+                text[self.cursor_pos[1]][: self.cursor_pos[0]] +
+                '\t' +
+                text[self.cursor_pos[1]][self.cursor_pos[0]:] +
+                '\n' +
+                '\n'.join(text[self.cursor_pos[1] + 1:])
+            )
             self.cursor_pos[0] += 1
+
         elif event.key == 'enter':
-            self.text = self.text[:self.cursor_pos[0]] + \
-                '\n' + self.text[self.cursor_pos[0]:]
+            prev = ''
+            for line in text[:self.cursor_pos[1]]:
+                prev += line + '\n'
+            self.text = (
+                prev +
+                text[self.cursor_pos[1]][: self.cursor_pos[0]] +
+                '\n' +
+                text[self.cursor_pos[1]][self.cursor_pos[0]:] +
+                '\n' +
+                '\n'.join(text[self.cursor_pos[1] + 1:])
+            )
             self.cursor_pos[0] = 0
             self.cursor_pos[1] += 1
 
         elif event.key == 'left':
+
             if self.cursor_pos[0] > 0:
                 self.cursor_pos[0] -= 1
+
             elif self.cursor_pos[1] > 0:
                 self.cursor_pos[1] -= 1
+                self.cursor_pos[0] = len(text[self.cursor_pos[1]])
 
         elif event.key == 'right':
-            if self.cursor_pos[0] < len(self.text.splitlines()[self.cursor_pos[1]]) - 1:
+
+            if self.cursor_pos[0] <= len(text[self.cursor_pos[1]]) - 1:
                 self.cursor_pos[0] += 1
-            elif self.cursor_pos[1] < len(self.text.splitlines()) - 1:
+
+            elif self.cursor_pos[1] < len(text) - 1:
                 self.cursor_pos[1] += 1
+                self.cursor_pos[0] = 0
+
         elif event.key == 'up':
-            self.cursor_pos[1] -= 1 if self.cursor_pos[1] > 0 else 0
+
+            if self.cursor_pos[1] > 0:
+                self.cursor_pos[1] -= 1
+            else:
+                self.cursor_pos[0] = 0
+
         elif event.key == 'down':
-            self.cursor_pos[1] += 1 if self.cursor_pos[1] < len(
-                self.text.splitlines()) - 1 else len(self.text.splitlines()) - 1
+
+            if self.cursor_pos[1] < len(text) - 1:
+                self.cursor_pos[1] += 1
+
+            else:
+                self.cursor_pos[0] = len(text[self.cursor_pos[1]])
 
         elif not event.key.startswith('ctrl'):
-            self.text = self.text[:self.cursor_pos[0]] + \
-                event.key + self.text[self.cursor_pos[0]:]
+            prev = ''
+            for line in text[:self.cursor_pos[1]]:
+                prev += line + '\n'
+            self.text = (
+                prev +
+                text[self.cursor_pos[1]][: self.cursor_pos[0]] +
+                event.key +
+                text[self.cursor_pos[1]][self.cursor_pos[0]:] +
+                '\n' +
+                '\n'.join(text[self.cursor_pos[1] + 1:])
+            )
             self.cursor_pos[0] += 1
-        print(self.cursor_pos)
         self.refresh(layout=True)
 
     async def on_focus(self, event) -> None:
@@ -108,8 +178,17 @@ class Input(Widget):
         self.cursor = ''
 
     async def on_click(self, event) -> None:
-        self.cursor_pos[0] = event.x
-        self.cursor_pos[1] = event.y
+        text = self.text.splitlines()
+        if event.y - OFFSET_Y > len(text):
+            self.cursor_pos[1] = len(text) - 1
+        else:
+            self.cursor_pos[1] = event.y - OFFSET_Y
+        if event.x - OFFSET_X > len(text[self.cursor_pos[1]]):
+            self.cursor_pos[0] = len(text)
+        else:
+            self.cursor_pos[0] = event.x - OFFSET_X
+        # print(len(text[self.cursor_pos[1]]))
+        # print(event.x - OFFSET_X)
 
 
 class MyApp(App):
@@ -155,11 +234,9 @@ class MyApp(App):
             # Construct a Syntax object for the path in the message
             with open(message.path) as f:
 
-                syntax = Input(f.read())
+                syntax = EditableArea(f.read())
         except Exception:
-            # Possibly a binary file
-            # For demonstration purposes we will show the traceback
-            syntax = Traceback(theme="monokai", width=None, show_locals=True)
+            syntax = Text('File format not supported')
         self.app.sub_title = os.path.basename(message.path)
         await self.body.update(syntax)
 
