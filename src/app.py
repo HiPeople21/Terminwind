@@ -1,23 +1,25 @@
-from typing import List
 import os
 import sys
-from rich.console import RenderableType
+from typing import List
+import aiofile
 
+from rich.console import RenderableType
 from rich.panel import Panel
 from rich.syntax import Syntax
-from rich.traceback import Traceback
 from rich.text import Text
-from textual.reactive import Reactive
+
 from textual.app import App
-from textual.widgets import Header, Footer, FileClick, ScrollView, DirectoryTree
+from textual.reactive import Reactive
 from textual.widget import Widget
+from textual.widgets import (DirectoryTree, FileClick, Footer, Header,
+                             ScrollView)
 
 OFFSET_X = 8
 OFFSET_Y = 1
 
 
 class EditableArea(Widget):
-    # TODO: Arrow Key Controls
+    # TODO: Mouse click event for y axis
     text = Reactive('')
     has_focus = Reactive(False)
     cursor = Reactive('|')
@@ -59,6 +61,7 @@ class EditableArea(Widget):
             word_wrap=True,
             indent_guides=True,
             theme="monokai",
+
         ))
 
     async def on_key(self, event) -> None:
@@ -67,6 +70,7 @@ class EditableArea(Widget):
         text = self.text.splitlines()
         self.cursor = '|'
 
+        # Handles backspace
         if event.key == 'ctrl+h':
 
             if self.cursor_pos[0] > 0:
@@ -82,7 +86,7 @@ class EditableArea(Widget):
 
                 self.cursor_pos[0] -= 1
             else:
-
+                # Handles backspace at start of line
                 self.text = (
                     '\n'.join(text[:self.cursor_pos[1]]) +
                     text[self.cursor_pos[1]][self.cursor_pos[0]:] +
@@ -93,6 +97,7 @@ class EditableArea(Widget):
                     self.cursor_pos[1] -= 1
                     self.cursor_pos[0] = len(text[self.cursor_pos[1]])
 
+        # Handles tab
         elif event.key == 'ctrl+i':
             prev = ''
             for line in text[:self.cursor_pos[1]]:
@@ -107,6 +112,7 @@ class EditableArea(Widget):
             )
             self.cursor_pos[0] += 1
 
+        # Handles enter
         elif event.key == 'enter':
             prev = ''
             for line in text[:self.cursor_pos[1]]:
@@ -122,6 +128,7 @@ class EditableArea(Widget):
             self.cursor_pos[0] = 0
             self.cursor_pos[1] += 1
 
+        # Handles left arrow
         elif event.key == 'left':
 
             if self.cursor_pos[0] > 0:
@@ -131,6 +138,7 @@ class EditableArea(Widget):
                 self.cursor_pos[1] -= 1
                 self.cursor_pos[0] = len(text[self.cursor_pos[1]])
 
+        # Handles right arrow
         elif event.key == 'right':
 
             if self.cursor_pos[0] <= len(text[self.cursor_pos[1]]) - 1:
@@ -140,6 +148,7 @@ class EditableArea(Widget):
                 self.cursor_pos[1] += 1
                 self.cursor_pos[0] = 0
 
+        # Handles up arrow
         elif event.key == 'up':
 
             if self.cursor_pos[1] > 0:
@@ -147,6 +156,9 @@ class EditableArea(Widget):
             else:
                 self.cursor_pos[0] = 0
 
+            await self.app.body.up()
+
+        # Handles down arrow
         elif event.key == 'down':
 
             if self.cursor_pos[1] < len(text) - 1:
@@ -155,6 +167,9 @@ class EditableArea(Widget):
             else:
                 self.cursor_pos[0] = len(text[self.cursor_pos[1]])
 
+            await self.app.body.down()
+
+        # Handles any other character
         elif not event.key.startswith('ctrl'):
             prev = ''
             for line in text[:self.cursor_pos[1]]:
@@ -179,16 +194,32 @@ class EditableArea(Widget):
 
     async def on_click(self, event) -> None:
         text = self.text.splitlines()
-        if event.y - OFFSET_Y > len(text):
+        if event.y - OFFSET_Y >= len(text):
             self.cursor_pos[1] = len(text) - 1
         else:
             self.cursor_pos[1] = event.y - OFFSET_Y
-        if event.x - OFFSET_X > len(text[self.cursor_pos[1]]):
-            self.cursor_pos[0] = len(text)
+        if event.x < OFFSET_X:
+            self.cursor_pos[0] = 0
+        elif event.x - OFFSET_X > len(text[self.cursor_pos[1]]):
+            self.cursor_pos[0] = len(text[self.cursor_pos[1]])
         else:
             self.cursor_pos[0] = event.x - OFFSET_X
-        # print(len(text[self.cursor_pos[1]]))
-        # print(event.x - OFFSET_X)
+
+
+class ScrollViewNoUpDownKeys(ScrollView):
+    async def key_down(self) -> None:
+        pass
+
+    async def key_up(self) -> None:
+        pass
+
+    async def down(self) -> None:
+        self.target_y += 2
+        self.animate("y", self.target_y, easing="linear", speed=100)
+
+    async def up(self) -> None:
+        self.target_y -= 2
+        self.animate("y", self.target_y, easing="linear", speed=100)
 
 
 class MyApp(App):
@@ -213,7 +244,7 @@ class MyApp(App):
 
         # Create our widgets
         # In this a scroll view for the code and a directory tree
-        self.body = ScrollView()
+        self.body = ScrollViewNoUpDownKeys()
         self.directory = DirectoryTree(self.path, "Code")
 
         # Dock our widgets
@@ -232,9 +263,8 @@ class MyApp(App):
         syntax: RenderableType
         try:
             # Construct a Syntax object for the path in the message
-            with open(message.path) as f:
-
-                syntax = EditableArea(f.read())
+            async with aiofile.async_open(message.path) as f:
+                syntax = EditableArea(await f.read())
         except Exception:
             syntax = Text('File format not supported')
         self.app.sub_title = os.path.basename(message.path)
@@ -242,4 +272,4 @@ class MyApp(App):
 
 
 # Run our app class
-MyApp.run(title="Code Viewer")
+MyApp.run(title="Code Viewer", log="Textual.log")
