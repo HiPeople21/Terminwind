@@ -1,53 +1,26 @@
-from inspect import isawaitable
-from typing import Callable
+from textual.views import GridView
 
-from textual.widget import Widget
-from textual.reactive import Reactive
-
-from rich.text import Text
+from button import Button
 
 
-class Button(Widget):
-
-    def __init__(self, text: str, func: str):
-        super().__init__()
-        self.text = text
-        self.func = func
-
-    mouse_over = Reactive(False)
-
-    def render(self):
-
-        return Text.assemble((f' {self.text} ', "white on grey" if self.mouse_over else "white on grey"), meta={
-            "@click": self.func})
-
-    async def on_enter(self) -> None:
-        self.mouse_over = True
-
-    async def on_leave(self) -> None:
-        self.mouse_over = False
-
-    async def on_click(self) -> None:
-        function = self.func()
-        if isawaitable(function):
-            await function
-
-
-def func():
-    print(1)
-
-
-class Menu(Widget):
+class Menu(GridView):
     def __init__(self) -> None:
-        super().__init__()
         self.buttons = (
-            Button('Open Folder', 'quit()'),
-            Button('New File', 'func()'),
-            Button('New Folder', 'func()'),
+            Button("Open Folder", quit),
+            Button("New File", quit),
+            Button("New Folder", quit),
         )
+        super().__init__()
 
-    def render(self) -> Text:
-        text = Text()
-        for button in self.buttons:
-            text.append_text(button.render())
-        return text
+    async def on_mount(self):
+        self.grid.set_gap(1, 0)
+        self.grid.add_column("col", repeat=3)
+        self.grid.add_row("buttons", max_size=1)
+        self.grid.add_areas(
+            button1="col1,buttons",
+            button2="col2,buttons",
+            button3="col3,buttons",
+        )
+        self.grid.place(
+            button1=self.buttons[0], button2=self.buttons[1], button3=self.buttons[2]
+        )

@@ -1,30 +1,36 @@
-from rich.syntax import Syntax
-from textual import events
-from textual.app import App
-from textual.widgets import Header, Footer, Placeholder, ScrollView
-from rich.text import Text
-from rich.table import Table
+import time
+import aiofile
 
 
-class MyApp(App):
-    """An example of a very simple Textual App"""
+async def main():
+    now = time.perf_counter()
+    with open("./temp/f.py", "r") as f:
+        g = f.read()
 
-    async def on_load(self, event: events.Load) -> None:
-        """Bind keys with the app loads (but before entering application mode)"""
-        await self.bind("b", "view.toggle('sidebar')", "Toggle sidebar")
-        await self.bind("q", "quit", "Quit")
-        self.syntax = Syntax('', lexer='python')
+    print(time.perf_counter() - now)
 
-    async def on_mount(self, event: events.Mount) -> None:
-        """Create and dock the widgets."""
+    now = time.perf_counter()
+    with open("./temp/f.py", "r") as f:
+        g = ""
+        for i in f:
+            g += i
 
-        # A scrollview to contain the markdown file
-        self.body = ScrollView(self.syntax.highlight(
-            code=open('terminal.py').read()), gutter=1, auto_width=True)
+    print(time.perf_counter() - now)
 
-        # Dock the body in the remaining space
-        # await self.view.dock(self.body, edge="right")
-        await self.view.dock(ScrollView(Text('\n'.join(dir(self.body)))), edge='left')
+    now = time.perf_counter()
+    async with aiofile.async_open("./temp/f.py", "r") as f:
+        g = await f.read()
+
+    print(time.perf_counter() - now)
+
+    now = time.perf_counter()
+    async with aiofile.async_open("./temp/f.py", "r") as f:
+        async for i in f:
+            g += i
+
+    print(time.perf_counter() - now)
 
 
-MyApp.run(title="Simple App")
+import asyncio
+
+asyncio.run(main())
