@@ -13,7 +13,7 @@ from rich.box import HEAVY
 from textual.reactive import Reactive
 from textual.widget import Widget
 
-from custom_scroll_view import CustomScrollView
+from .custom_scroll_view import CustomScrollView
 
 OFFSET_X = 8
 OFFSET_Y = 1
@@ -142,9 +142,7 @@ class EditableArea(Widget):
             else:
                 rendered_text += line_no + line + "\n"
 
-        return Panel(
-            rendered_text,box=HEAVY
-        )
+        return Panel(rendered_text, box=HEAVY)
 
     async def backspace(self, text, trailing, *args):
         if self.cursor_pos[0] > len(text[self.cursor_pos[1]]):

@@ -1,7 +1,7 @@
 from textual.reactive import Reactive
 from textual.views import GridView
 
-from button import Button
+from .button import Button
 
 
 class Sidebar(GridView):

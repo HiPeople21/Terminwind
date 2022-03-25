@@ -16,14 +16,14 @@ from textual.widgets import (
 )
 
 
-from header import Header
-from editable_area import EditableArea
-from custom_scroll_view import CustomScrollView
-from resizing_directory_tree import ResizingDirectoryTree
-from sidebar import Sidebar
+from .header import Header
+from .editable_area import EditableArea
+from .custom_scroll_view import CustomScrollView
+from .resizing_directory_tree import ResizingDirectoryTree
+from .sidebar import Sidebar
 
 
-class TerminalEditor(App):
+class Terminwind(App):
     async def on_load(self) -> None:
         """Sent before going in to application mode."""
         # Bind our basic keys
@@ -73,5 +73,3 @@ class TerminalEditor(App):
         await self.body.update(syntax)
 
 
-# Run our app class
-TerminalEditor.run(title="Terminwind")

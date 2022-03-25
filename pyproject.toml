@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "terminaleditor"
+name = "terminwind"
 version = "0.1.0"
 description = ""
 authors = ["Yubo Wang <yubowang2007@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 rich = "^11"
 textual = "^0.1.15"
 aiofile = "^3.7.4"
