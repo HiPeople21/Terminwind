@@ -1,4 +1,4 @@
-from .app import Terminwind
+from . import run
 
-
-Terminwind.run(title="Terminwind")
+if __name__ == "__main__":
+    run()

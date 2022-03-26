@@ -71,5 +71,3 @@ class Terminwind(App):
         self.app.sub_title = os.path.basename(message.path)
 
         await self.body.update(syntax)
-
-

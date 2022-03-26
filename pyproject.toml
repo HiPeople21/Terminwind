@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "terminwind"
-version = "0.1.1"
-description = ""
+version = "0.1.3"
+description = "A terminal code editor built with Textual"
 authors = ["Yubo Wang <yubowang2007@gmail.com>"]
 
 [tool.poetry.dependencies]

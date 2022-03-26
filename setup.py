@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="terminwind",
-    version="0.1.0",
+    version="0.1.3",
     author="Yubo Wang",
     author_email="yubowang2007@gmail.com",
     description="A terminal code editor built with Textual",
@@ -21,6 +21,12 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     packages=["terminwind"],
-    python_requires=">=3.9",
-    entry_points={"console_scripts": ["terminwind = terminwind.main:main"]},
+    install_requires=[
+        "rich>=11",
+        "textual>=0.1.15",
+        "aiofile>=3.7.4",
+        "pyperclip>=1.8.2",
+    ],
+    python_requires=">=3.7",
+    entry_points={"console_scripts": ["terminwind=terminwind:run"]},
 )
